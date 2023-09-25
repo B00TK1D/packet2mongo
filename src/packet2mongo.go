@@ -2,6 +2,7 @@ package main
 
 import (
 	"log"
+	"os"
 
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
@@ -12,12 +13,12 @@ import (
 
 const (
 	// Interface to capture on
-	iface = "en0"
+	// iface = "lo0"
 
 	// Mongodb connection info
-	mongoURI = "mongodb://localhost:27017"
-	dbName   = "traffic"
-	colName  = "packets"
+	// mongoURI = "mongodb://localhost:27017"
+	dbName  = "traffic"
+	colName = "packets"
 
 	// The same default as tcpdump.
 	defaultSnapLen = 262144
@@ -29,9 +30,17 @@ type Packet struct {
 	Dst    string
 	TTL    uint8
 	Length uint16
+	Iface  string
 }
 
 func main() {
+
+	// Read in cmd line args
+	if len(os.Args) != 3 {
+		log.Fatal("Usage: packet2mongo <interface> <mongodb_uri>")
+	}
+	iface := os.Args[1]
+	mongoURI := os.Args[2]
 
 	// Open pcap handle
 	handle, err := pcap.OpenLive("en0", defaultSnapLen, true,
@@ -75,6 +84,7 @@ func main() {
 			Dst:    dst,
 			TTL:    ttl,
 			Length: length,
+			Iface:  iface,
 		}
 		_, err := collection.InsertOne(nil, packet)
 		if err != nil {
