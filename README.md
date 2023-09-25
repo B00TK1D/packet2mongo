@@ -20,5 +20,5 @@ Run:
 
 ```bash
 go build .
-./packet2mongo en0 mongodb://localhost
+./packet2mongo eth0 mongodb://localhost
 ```
