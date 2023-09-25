@@ -9,7 +9,15 @@ usage: packet2mongo.py <interface> <mongo_uri> [capture_tags]
 ```
 
 ## Example
-Pre-requisite: MongoDB server running on localhost (`bash scripts/start_mongo.sh`)
+Pre-requisite:
+* libpcap-dev installed
+  * Linux: `sudo apt-get install libpcap-dev`
+  * Mac: `brew install libpcap`
+  * Windows: Install linux
+* MongoDB server running on localhost (`bash scripts/start_mongo.sh`)
+
+Run:
+
 ```bash
 go build .
 ./packet2mongo en0 mongodb://localhost
