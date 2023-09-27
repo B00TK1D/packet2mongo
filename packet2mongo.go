@@ -1,10 +1,12 @@
 package main
 
 import (
+	"context"
+	"flag"
 	"fmt"
 	"log"
-	"os"
 	"strconv"
+	"strings"
 
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
@@ -13,18 +15,14 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-const (
-	// Interface to capture on
-	// iface = "lo0"
+var iface = flag.String("i", "eth0", "Interface to get packets from")
+var mongoURI = flag.String("m", "mongodb://localhost:27017", "Mongodb URI")
+var dbName = flag.String("d", "traffic", "Mongodb database name")
+var colName = flag.String("c", "packets", "Mongodb collection name")
+var snaplen = flag.Int("s", 16<<10, "SnapLen for pcap packet capture")
+var captureTags = flag.String("t", "", "Comma separated list of tags to add to each packet")
 
-	// Mongodb connection info
-	// mongoURI = "mongodb://localhost:27017"
-	dbName  = "traffic"
-	colName = "packets"
-
-	// The same default as tcpdump.
-	defaultSnapLen = 262144
-)
+var ctxTodo = context.TODO()
 
 type TCPFlag struct {
 	NS  bool
@@ -65,27 +63,16 @@ type Packet struct {
 func main() {
 
 	// Read in cmd line args
-	if len(os.Args) != 3 {
-		log.Fatal("Usage: packet2mongo <interface> <mongodb_uri> [capture_tags]")
-	}
-	iface := os.Args[1]
-	mongoURI := os.Args[2]
-
-	// Get capture tags
-	var captureTags []string
-	if len(os.Args) > 3 {
-		captureTags = os.Args[3:]
-	}
+	flag.Parse()
 
 	// Get mongo port number from URI
-	mongoPort, err := strconv.ParseUint(mongoURI[len(mongoURI)-5:], 10, 16)
+	mongoPort, err := strconv.ParseUint((*mongoURI)[len(*mongoURI)-5:], 10, 16)
 	if err != nil {
 		mongoPort = 27017
 	}
 
 	// Open pcap handle
-	handle, err := pcap.OpenLive(iface, defaultSnapLen, true,
-		pcap.BlockForever)
+	handle, err := pcap.OpenLive(*iface, int32(*snaplen), true, pcap.BlockForever)
 	if err != nil {
 		panic(err)
 	}
@@ -98,13 +85,13 @@ func main() {
 	}
 
 	// Connect to mongodb
-	client, err := mongo.Connect(nil, options.Client().ApplyURI(mongoURI))
+	client, err := mongo.Connect(ctxTodo, options.Client().ApplyURI(*mongoURI))
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer client.Disconnect(nil)
-	database := client.Database(dbName)
-	collection := database.Collection(colName)
+	defer client.Disconnect(ctxTodo)
+	database := client.Database(*dbName)
+	collection := database.Collection(*colName)
 
 	// Capture packets
 	packets := gopacket.NewPacketSource(
@@ -112,8 +99,8 @@ func main() {
 	for pkt := range packets {
 
 		packet := Packet{
-			Iface:       iface,
-			CaptureTags: captureTags,
+			Iface:       *iface,
+			CaptureTags: strings.Split(*captureTags, ","),
 		}
 
 		// Get link layer
@@ -158,7 +145,7 @@ func main() {
 		if err != nil {
 			log.Fatal(err)
 		}
-		dstPort, err := strconv.ParseUint(transportLayer.TransportFlow().Dst().String(), 10, 16)
+		packet.DstPort, err = strconv.ParseUint(transportLayer.TransportFlow().Dst().String(), 10, 16)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -184,14 +171,13 @@ func main() {
 			packet.Payload = tcpLayer.Payload
 		} else if transportLayer.LayerType() == layers.LayerTypeUDP {
 			udpLayer := transportLayer.(*layers.UDP)
-			packet.DstPort = uint64(dstPort)
 			packet.PayloadLen = uint16(len(udpLayer.Payload))
 			packet.Payload = udpLayer.Payload
 		} else {
 			continue
 		}
 
-		_, err = collection.InsertOne(nil, packet)
+		_, err = collection.InsertOne(ctxTodo, packet)
 		if err != nil {
 			log.Fatal(err)
 		}
