@@ -4,7 +4,7 @@
 Capture packets off the wire and store them in a MongoDB database.
 
 ## Usage
-```bash
+```
 $ ./packet2mongo --help
   -c string
         Mongodb collection name (default "packets")
@@ -22,17 +22,9 @@ $ ./packet2mongo --help
         Comma separated list of tags to add to each packet
 ```
 
-## Example
-Pre-requisite:
+## Pre-requisites
 * libpcap-dev installed
   * Linux: `sudo apt-get install libpcap-dev`
   * Mac: `brew install libpcap`
   * Windows: Install linux
 * MongoDB server running on localhost (`bash scripts/start_mongo.sh`)
-
-Run:
-
-```bash
-go build .
-./packet2mongo eth0 mongodb://localhost
-```
