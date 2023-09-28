@@ -4,8 +4,22 @@
 Capture packets off the wire and store them in a MongoDB database.
 
 ## Usage
-```
-usage: packet2mongo.py <interface> <mongo_uri> [capture_tags]
+```bash
+$ ./packet2mongo --help
+  -c string
+        Mongodb collection name (default "packets")
+  -d string
+        Mongodb database name (default "traffic")
+  -f string
+        Pcap file to read from instead of live capture
+  -i string
+        Interface to get packets from (default "eth0")
+  -m string
+        Mongodb URI (default "mongodb://localhost:27017")
+  -s int
+        SnapLen for pcap packet capture (default 16384)
+  -t string
+        Comma separated list of tags to add to each packet
 ```
 
 ## Example
