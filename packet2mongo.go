@@ -16,6 +16,7 @@ import (
 )
 
 var iface = flag.String("i", "eth0", "Interface to get packets from")
+var pcapFile = flag.String("f", "", "Pcap file to read from instead of live capture")
 var mongoURI = flag.String("m", "mongodb://localhost:27017", "Mongodb URI")
 var dbName = flag.String("d", "traffic", "Mongodb database name")
 var colName = flag.String("c", "packets", "Mongodb collection name")
@@ -71,10 +72,18 @@ func main() {
 		mongoPort = 27017
 	}
 
+	handle := new(pcap.Handle)
 	// Open pcap handle
-	handle, err := pcap.OpenLive(*iface, int32(*snaplen), true, pcap.BlockForever)
-	if err != nil {
-		panic(err)
+	if *pcapFile != "" {
+		handle, err = pcap.OpenOffline(*pcapFile)
+		if err != nil {
+			panic(err)
+		}
+	} else {
+		handle, err = pcap.OpenLive(*iface, int32(*snaplen), true, pcap.BlockForever)
+		if err != nil {
+			panic(err)
+		}
 	}
 	defer handle.Close()
 
@@ -98,6 +107,8 @@ func main() {
 		handle, handle.LinkType()).Packets()
 	for pkt := range packets {
 
+		log.Println(pkt)
+
 		packet := Packet{
 			Iface:       *iface,
 			CaptureTags: strings.Split(*captureTags, ","),
@@ -105,12 +116,15 @@ func main() {
 
 		// Get link layer
 		linkLayer := pkt.LinkLayer()
-		if linkLayer == nil {
-			continue
+		if linkLayer != nil {
+			packet.SrcMac = linkLayer.LinkFlow().Src().String()
+			packet.DstMac = linkLayer.LinkFlow().Dst().String()
 		}
+
 		// Get network layer
 		netLayer := pkt.NetworkLayer()
 		if netLayer == nil {
+			log.Println("No network layer")
 			continue
 		}
 
@@ -124,6 +138,7 @@ func main() {
 			// Try IPv6
 			ipLayer = pkt.Layer(layers.LayerTypeIPv6)
 			if ipLayer != nil {
+				log.Println("No IP layer")
 				continue
 			}
 			packet.IpVer = 6
@@ -133,12 +148,11 @@ func main() {
 		// Get transport layer
 		transportLayer := pkt.TransportLayer()
 		if transportLayer == nil {
+			log.Println("No transport layer")
 			continue
 		}
 
 		packet.Timestamp = pkt.Metadata().Timestamp.UnixNano()
-		packet.SrcMac = linkLayer.LinkFlow().Src().String()
-		packet.DstMac = linkLayer.LinkFlow().Dst().String()
 		packet.DstIp = netLayer.NetworkFlow().Dst().String()
 		packet.SrcIp = netLayer.NetworkFlow().Src().String()
 		packet.SrcPort, err = strconv.ParseUint(transportLayer.TransportFlow().Src().String(), 10, 16)
