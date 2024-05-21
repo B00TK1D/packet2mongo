@@ -59,6 +59,7 @@ type Packet struct {
 	PayloadLen  uint16
 	Payload     []byte
 	CaptureTags []string
+	Processed   bool
 }
 
 func main() {
@@ -112,6 +113,7 @@ func main() {
 		packet := Packet{
 			Iface:       *iface,
 			CaptureTags: strings.Split(*captureTags, ","),
+			Processed:   false,
 		}
 
 		// Get link layer
